@@ -191,6 +191,18 @@ h1, h2, p { margin-top: 0; }
 .customer-balance-highlight { border-color: #f1d8d1; background: #fff8f6; }
 .customer-balance-highlight strong { color: #a94235; }
 .customer-history-table { min-width: 850px; }
+.sale-edit-panel { padding: 23px; }
+.sale-edit-section + .sale-edit-section { margin-top: 25px; padding-top: 22px; border-top: 1px solid #eef1ed; }
+.sale-edit-section .inventory-heading { padding: 0 0 16px; }
+.sale-items-list { display: grid; gap: 12px; }
+.sale-item-row { display: grid; grid-template-columns: minmax(0, 1fr) 150px auto; align-items: end; gap: 12px; padding: 14px; background: #f8faf8; border: 1px solid #edf1ed; border-radius: 9px; }
+.sale-item-row .form-field { margin-bottom: 0; }
+.sale-item-row .form-field select, .sale-item-row .form-field input { width: 100%; }
+.sale-item-row .button { min-height: 42px; margin-bottom: 0; }
+.sale-line-price { display: block; margin-top: 6px; color: #78857e; font-size: 10px; }
+.sale-edit-actions { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 24px; }
+.sale-edit-actions .button { min-height: 42px; text-decoration: none; }
+.sale-edit-section #sale-cash-fields[hidden] { display: none; }
 .debt-payment-form { display: grid; gap: 6px; min-width: 170px; margin-top: 7px; }
 .debt-payment-form input, .debt-payment-form select { width: 100%; min-width: 0; height: 33px; padding: 0 8px; color: var(--ink); background: #fff; border: 1px solid #e0e7e1; border-radius: 6px; font-size: 10px; }
 .debt-payment-form .button { min-height: 33px; padding: 0 8px; font-size: 10px; }
@@ -228,6 +240,7 @@ h1, h2, p { margin-top: 0; }
 .receipt-items { width: 100%; margin: 13px 0; border-collapse: collapse; font-size: 10px; }
 .receipt-items th, .receipt-items td { padding: 5px 2px; text-align: right; vertical-align: top; }
 .receipt-items th:first-child, .receipt-items td:first-child { text-align: left; }
+.receipt-items td strong { font-weight: 700; }
 .receipt-items thead { border-bottom: 1px solid #7b847e; }
 .receipt-total { padding: 9px 0; border-top: 1px dashed #7b847e; font-size: 14px; font-weight: 700; }
 .receipt-cash-details { display: grid; gap: 5px; font-size: 10px; }
@@ -250,6 +263,8 @@ h1, h2, p { margin-top: 0; }
         font-family: Arial, sans-serif;
         font-size: 10px;
     }
+    .receipt-items { font-size: 8px; }
+    .receipt-items th, .receipt-items td { padding: 4px 1px; }
 }
 
 .stock-stats { display: flex; gap: 9px; }
@@ -461,6 +476,9 @@ h1, h2, p { margin-top: 0; }
     .stock-filters input { flex-basis: 100%; }
     .low-stock-alert { align-items: flex-start; padding: 12px; }
     .low-stock-alert > a { align-self: center; font-size: 9px; }
+    .sale-edit-panel { padding: 18px; }
+    .sale-item-row { grid-template-columns: minmax(0, 1fr) 105px; gap: 9px; padding: 11px; }
+    .sale-item-row .remove-sale-item { grid-column: 1 / -1; }
 }
 
 @media (max-width: 430px) {
@@ -481,4 +499,6 @@ h1, h2, p { margin-top: 0; }
     .logout-button { padding: 5px 6px; }
     .login-panel { padding: 26px 21px; }
     .profit-card { padding: 15px 11px; }
+    .sale-edit-section .inventory-heading { align-items: flex-start; gap: 10px; }
+    .sale-edit-section .inventory-heading .button { min-height: 36px; padding: 0 10px; font-size: 10px; }
 }

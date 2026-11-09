@@ -39,6 +39,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/products', [ProductController::class, 'store'])->name('products.store');
 
     Route::middleware('role:owner')->group(function () {
+        Route::get('/sales/{sale}/edit', [SalesController::class, 'edit'])->name('sales.edit');
+        Route::put('/sales/{sale}', [SalesController::class, 'update'])->name('sales.update');
+        Route::delete('/sales/{sale}', [SalesController::class, 'destroy'])->name('sales.destroy');
         Route::get('/sales-managers', [SalesManagerController::class, 'index'])->name('sales-managers.index');
         Route::post('/sales-managers', [SalesManagerController::class, 'store'])->name('sales-managers.store');
         Route::patch('/sales-managers/{salesManager}', [SalesManagerController::class, 'update'])->name('sales-managers.update');

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Customer;
 use App\Models\Product;
 use App\Models\Sale;
 use App\Models\SaleItem;
@@ -30,6 +31,46 @@ class PosWorkflowTest extends TestCase
         $this->get(route('products.index'))
             ->assertOk()
             ->assertSee('Stock room');
+    }
+
+    public function test_stock_list_can_be_filtered_by_a_selected_brand(): void
+    {
+        Product::query()->create([
+            'barcode' => 'FILTER-BRAND-003',
+            'name' => 'Frozen Zucchini',
+            'brand' => null,
+            'price' => 1000,
+            'stock' => 3,
+        ]);
+        Product::query()->create([
+            'barcode' => 'FILTER-BRAND-002',
+            'name' => 'Frozen Shrimp',
+            'brand' => 'Ocean Foods',
+            'price' => 1000,
+            'stock' => 3,
+        ]);
+        Product::query()->create([
+            'barcode' => 'FILTER-BRAND-001',
+            'name' => 'Frozen Fish',
+            'brand' => 'Ocean Foods',
+            'price' => 1000,
+            'stock' => 3,
+        ]);
+        Product::query()->create([
+            'barcode' => 'FILTER-BRAND-004',
+            'name' => 'Frozen Chicken',
+            'brand' => 'Arctic Foods',
+            'price' => 1000,
+            'stock' => 3,
+        ]);
+
+        $this->get(route('products.index', ['brand' => 'Ocean Foods']))
+            ->assertOk()
+            ->assertSee('id="brand-filter"', false)
+            ->assertSee('<option value="Ocean Foods" selected>Ocean Foods</option>', false)
+            ->assertViewHas('brandFilter', 'Ocean Foods')
+            ->assertViewHas('products', fn ($products): bool => $products->getCollection()->pluck('brand')->all()
+                === ['Ocean Foods', 'Ocean Foods']);
     }
 
     public function test_manager_can_view_sales_list_with_customer_products_and_seller(): void
@@ -125,8 +166,18 @@ class PosWorkflowTest extends TestCase
             ->assertSee('optional')
             ->assertSee('REGULAR CUSTOMER')
             ->assertSee('SALES MANAGER')
+            ->assertSee('ORDER TYPE')
+            ->assertSee('Walk-in')
+            ->assertSee('Delivery')
+            ->assertSee('Delivery requires a regular customer with a saved address.')
+            ->assertSee('id="receipt-fulfillment-type"', false)
             ->assertSee('Print receipt')
-            ->assertSee('Price / unit')
+            ->assertSee('Product')
+            ->assertDontSee('<th>Item</th>', false)
+            ->assertSee('MRP')
+            ->assertSee('Qty')
+            ->assertSee('Sale price')
+            ->assertSee('Total')
             ->assertDontSee('Rp0');
     }
 
@@ -148,6 +199,9 @@ class PosWorkflowTest extends TestCase
             ->assertSee('PAYMENT METHOD')
             ->assertSee('SALES MANAGER')
             ->assertSee('Checkout Manager')
+            ->assertSee('ORDER TYPE')
+            ->assertSee('Walk-in')
+            ->assertSee('Delivery')
             ->assertSee('Cash')
             ->assertSee('GPay')
             ->assertSee('Bank transfer')
@@ -502,6 +556,7 @@ class PosWorkflowTest extends TestCase
             ->assertJsonPath('change_due', 0)
             ->assertJsonPath('items.0.name', 'Frozen Chicken')
             ->assertJsonPath('items.0.quantity', 1)
+            ->assertJsonPath('items.0.mrp', 32000)
             ->assertJsonPath('items.0.unit_price', 25000)
             ->assertJsonPath('items.0.line_total', 25000)
             ->assertJsonPath('payment_method', 'cash');
@@ -518,6 +573,26 @@ class PosWorkflowTest extends TestCase
             'line_total' => 25000,
         ]);
         $this->assertSame(1, Sale::query()->count());
+    }
+
+    public function test_current_bill_displays_product_mrp(): void
+    {
+        $product = Product::query()->create([
+            'barcode' => 'CURRENT-BILL-MRP-001',
+            'name' => 'Frozen Fish Fillet',
+            'mrp' => 18000,
+            'price' => 15000,
+            'unit_cost' => 9000,
+            'stock' => 3,
+        ]);
+
+        $this->postJson(route('cart.items.add'), ['barcode' => $product->barcode])
+            ->assertOk()
+            ->assertJsonPath('cart.items.0.mrp', 18000);
+
+        $this->get(route('pos.index'))
+            ->assertOk()
+            ->assertViewHas('cart.items.0.mrp', 18000);
     }
 
     public function test_customer_details_are_saved_and_returned_with_the_receipt(): void
@@ -582,6 +657,7 @@ class PosWorkflowTest extends TestCase
 
         $this->checkout()
             ->assertOk()
+            ->assertJsonPath('fulfillment_type', 'walk_in')
             ->assertJsonPath('customer_name', null)
             ->assertJsonPath('customer_phone', null)
             ->assertJsonPath('customer_address', null);
@@ -590,8 +666,91 @@ class PosWorkflowTest extends TestCase
             'customer_id' => null,
             'customer_name' => null,
             'payment_method' => 'cash',
+            'fulfillment_type' => 'walk_in',
         ]);
         $this->assertSame(0, $product->fresh()->stock);
+    }
+
+    public function test_delivery_checkout_records_the_selected_customer_and_saved_address(): void
+    {
+        $customer = Customer::query()->create([
+            'name' => 'North Market',
+            'phone' => '081234567890',
+            'address' => '12 Market Road',
+        ]);
+        $product = Product::query()->create([
+            'barcode' => 'DELIVERY-001',
+            'name' => 'Frozen Fish',
+            'price' => 18000,
+            'unit_cost' => 12000,
+            'stock' => 2,
+        ]);
+        $this->postJson('/cart/items', ['barcode' => $product->barcode])->assertOk();
+
+        $this->checkout([
+            'fulfillment_type' => 'delivery',
+            'customer_id' => $customer->id,
+        ])
+            ->assertOk()
+            ->assertJsonPath('fulfillment_type', 'delivery')
+            ->assertJsonPath('customer_name', 'North Market')
+            ->assertJsonPath('customer_address', '12 Market Road');
+
+        $this->assertDatabaseHas('sales', [
+            'customer_id' => $customer->id,
+            'fulfillment_type' => 'delivery',
+            'customer_address' => '12 Market Road',
+        ]);
+        $this->assertSame(1, $product->fresh()->stock);
+
+        $this->get(route('sales.index'))
+            ->assertOk()
+            ->assertSee('Delivery')
+            ->assertSee('North Market');
+    }
+
+    public function test_delivery_checkout_requires_a_customer(): void
+    {
+        $product = Product::query()->create([
+            'barcode' => 'DELIVERY-002',
+            'name' => 'Frozen Chicken',
+            'price' => 18000,
+            'unit_cost' => 12000,
+            'stock' => 2,
+        ]);
+        $this->postJson('/cart/items', ['barcode' => $product->barcode])->assertOk();
+
+        $this->checkout(['fulfillment_type' => 'delivery'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('customer_id');
+
+        $this->assertDatabaseCount('sales', 0);
+        $this->assertSame(2, $product->fresh()->stock);
+    }
+
+    public function test_delivery_checkout_requires_a_saved_customer_address(): void
+    {
+        $customer = Customer::query()->create(['name' => 'North Market']);
+        $product = Product::query()->create([
+            'barcode' => 'DELIVERY-003',
+            'name' => 'Frozen Shrimp',
+            'price' => 18000,
+            'unit_cost' => 12000,
+            'stock' => 2,
+        ]);
+        $this->postJson('/cart/items', ['barcode' => $product->barcode])->assertOk();
+
+        $this->checkout([
+            'fulfillment_type' => 'delivery',
+            'customer_id' => $customer->id,
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors([
+                'customer_id' => 'Delivery sales require a customer with a saved address.',
+            ]);
+
+        $this->assertDatabaseCount('sales', 0);
+        $this->assertSame(2, $product->fresh()->stock);
     }
 
     public function test_checkout_requires_an_active_sales_manager_selection(): void

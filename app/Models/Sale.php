@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'sold_by_name',
     'customer_id',
     'payment_method',
+    'fulfillment_type',
     'customer_name',
     'customer_phone',
     'customer_address',

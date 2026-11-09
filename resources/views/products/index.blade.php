@@ -222,8 +222,15 @@
                     <option value="low" @selected($stockFilter === 'low')>Low stock</option>
                     <option value="out" @selected($stockFilter === 'out')>Out of stock</option>
                 </select>
-                <button type="submit" class="button button-secondary">Search</button>
-                @if ($search !== '' || $stockFilter !== 'all')
+                <label class="sr-only" for="brand-filter">Filter by brand or company</label>
+                <select id="brand-filter" name="brand">
+                    <option value="">All brands / companies</option>
+                    @foreach ($brands as $brand)
+                        <option value="{{ $brand }}" @selected($brandFilter === $brand)>{{ $brand }}</option>
+                    @endforeach
+                </select>
+                <button type="submit" class="button button-secondary">Apply</button>
+                @if ($search !== '' || $stockFilter !== 'all' || $brandFilter !== '')
                     <a class="clear-filters" href="{{ route('products.index') }}">Clear</a>
                 @endif
             </form>

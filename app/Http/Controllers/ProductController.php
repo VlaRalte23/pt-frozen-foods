@@ -16,10 +16,13 @@ class ProductController extends Controller
         $validated = $request->validate([
             'search' => ['nullable', 'string', 'max:120'],
             'stock' => ['nullable', Rule::in(['all', 'low', 'out'])],
+            'brand' => ['nullable', 'string', 'max:120'],
         ]);
         $search = trim($validated['search'] ?? '');
         $stockFilter = $validated['stock'] ?? 'all';
+        $brandFilter = $validated['brand'] ?? '';
         $matchingProducts = Product::query()
+            ->when($brandFilter !== '', fn ($query) => $query->where('brand', $brandFilter))
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($query) use ($search): void {
                     $query->where('name', 'like', "%{$search}%")
@@ -37,7 +40,7 @@ class ProductController extends Controller
         }
 
         return view('products.index', [
-            'products' => $productsQuery->orderBy('name')->paginate(20)->withQueryString(),
+            'products' => $productsQuery->paginate(20)->withQueryString(),
             'productCount' => Product::query()->count(),
             'lowStockCount' => Product::query()
                 ->where('stock', '>', 0)
@@ -46,6 +49,7 @@ class ProductController extends Controller
             'outOfStockCount' => Product::query()->where('stock', 0)->count(),
             'attentionProducts' => Product::query()
                 ->whereColumn('stock', '<=', 'low_stock_threshold')
+                ->when($brandFilter !== '', fn ($query) => $query->where('brand', $brandFilter))
                 ->when($search !== '', function ($query) use ($search): void {
                     $query->where(function ($query) use ($search): void {
                         $query->where('name', 'like', "%{$search}%")
@@ -65,6 +69,7 @@ class ProductController extends Controller
                 ->pluck('brand'),
             'search' => $search,
             'stockFilter' => $stockFilter,
+            'brandFilter' => $brandFilter,
             'isOwner' => request()->user()->isOwner(),
         ]);
     }

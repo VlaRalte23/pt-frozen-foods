@@ -67,6 +67,11 @@
                 <span>TOTAL TO PAY</span>
                 <strong id="grand-total">₹ 0</strong>
             </div>
+            <label class="field-label" for="fulfillment-type">ORDER TYPE</label>
+            <select id="fulfillment-type" class="payment-method-select">
+                <option value="walk_in">Walk-in</option>
+                <option value="delivery">Delivery</option>
+            </select>
             <label class="field-label" for="payment-method">PAYMENT METHOD</label>
             <select id="payment-method" class="payment-method-select">
                 <option value="cash">Cash</option>
@@ -113,6 +118,7 @@
                     </form>
                 </div>
                 <p id="credit-hint" class="help-text" hidden>Credit sales must be assigned to a regular customer. The full balance will appear in Customer Debts.</p>
+                <p id="delivery-hint" class="help-text" hidden>Delivery requires a regular customer with a saved address. Select a customer or add one with an address.</p>
             </section>
             <div id="cash-payment-fields">
                 <label class="field-label" for="cash-received">CASH RECEIVED <span id="cash-received-requirement">required</span></label>
@@ -145,6 +151,7 @@
             <div><span>Receipt</span><strong id="receipt-number"></strong></div>
             <div><span>Date</span><strong id="receipt-date"></strong></div>
             <div><span>Sales manager</span><strong id="receipt-sales-manager"></strong></div>
+            <div><span>Order type</span><strong id="receipt-fulfillment-type"></strong></div>
             <div><span>Payment</span><strong id="receipt-payment-method"></strong></div>
         </div>
         <div id="receipt-customer-details" class="receipt-customer-details" hidden>
@@ -156,9 +163,10 @@
         <table class="receipt-items">
             <thead>
                 <tr>
-                    <th>Item</th>
+                    <th>Product</th>
+                    <th>MRP</th>
                     <th>Qty</th>
-                    <th>Price / unit</th>
+                    <th>Sale price</th>
                     <th>Total</th>
                 </tr>
             </thead>

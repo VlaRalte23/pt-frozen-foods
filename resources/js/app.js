@@ -57,6 +57,7 @@ if (posApp) {
     const emptyCart = document.querySelector('#empty-cart');
     const countLabel = document.querySelector('#item-count');
     const totalLabel = document.querySelector('#grand-total');
+    const fulfillmentTypeInput = document.querySelector('#fulfillment-type');
     const paymentMethodInput = document.querySelector('#payment-method');
     const salesManagerInput = document.querySelector('#sales-manager');
     const customerSearchInput = document.querySelector('#customer-search');
@@ -69,6 +70,7 @@ if (posApp) {
     const newCustomerForm = document.querySelector('#new-customer-form');
     const customerMessage = document.querySelector('#customer-message');
     const creditHint = document.querySelector('#credit-hint');
+    const deliveryHint = document.querySelector('#delivery-hint');
     const cashPaymentFields = document.querySelector('#cash-payment-fields');
     const cashInput = document.querySelector('#cash-received');
     const cashRequirementLabel = document.querySelector('#cash-received-requirement');
@@ -168,13 +170,20 @@ if (posApp) {
         const received = cashInput.value === '' ? Number.NaN : Number(cashInput.value);
         const valid = cashInput.value !== '' && Number.isFinite(received) && received >= total;
         const isCredit = paymentMethodInput.value === 'credit';
+        const isDelivery = fulfillmentTypeInput.value === 'delivery';
+        const hasDeliveryAddress = Boolean(selectedCustomer?.address?.trim());
 
         cashPaymentFields.hidden = !isCash;
         cashInput.required = isCash;
         cashRequirementLabel.textContent = isCash ? 'required' : 'optional';
         creditHint.hidden = !isCredit;
+        deliveryHint.hidden = !isDelivery || (Boolean(selectedCustomer) && hasDeliveryAddress);
         changeLabel.textContent = formatRupee(valid ? received - total : 0);
-        checkoutButton.disabled = total <= 0 || !salesManagerInput.value || (isCash && !valid) || (isCredit && !selectedCustomer);
+        checkoutButton.disabled = total <= 0
+            || !salesManagerInput.value
+            || (isCash && !valid)
+            || (isCredit && !selectedCustomer)
+            || (isDelivery && !hasDeliveryAddress);
     }
 
     function selectCustomer(customer) {
@@ -241,7 +250,7 @@ if (posApp) {
             name.textContent = item.name;
             const meta = document.createElement('span');
             meta.className = 'cart-item-meta';
-            meta.textContent = `${item.barcode} · ${formatRupee(item.price)} / ${item.quantity_unit}`;
+            meta.textContent = `${item.barcode} · MRP ${formatRupee(item.mrp)} · ${formatRupee(item.price)} / ${item.quantity_unit}`;
             info.append(name, meta);
 
             const priceForm = document.createElement('form');
@@ -592,6 +601,7 @@ if (posApp) {
     });
 
     cashInput.addEventListener('input', updatePayment);
+    fulfillmentTypeInput.addEventListener('change', updatePayment);
     paymentMethodInput.addEventListener('change', updatePayment);
     salesManagerInput.addEventListener('change', updatePayment);
 
@@ -613,6 +623,7 @@ if (posApp) {
             credit: 'Credit / pay later',
         }[receipt.payment_method];
         document.querySelector('#receipt-sales-manager').textContent = receipt.sales_manager_name;
+        document.querySelector('#receipt-fulfillment-type').textContent = receipt.fulfillment_type === 'delivery' ? 'Delivery' : 'Walk-in';
         document.querySelector('#receipt-total').textContent = formatRupee(receipt.total);
         document.querySelector('#receipt-total-label').textContent = receipt.payment_method === 'credit' ? 'Sale total' : 'Total';
         const creditDetails = document.querySelector('#receipt-credit-details');
@@ -638,17 +649,26 @@ if (posApp) {
         receiptItems.replaceChildren();
         receipt.items.forEach((item) => {
             const row = document.createElement('tr');
-            [
-                item.name,
-                `${item.quantity} ${item.quantity_unit}`,
-                `${formatRupee(item.unit_price)} / ${item.quantity_unit}`,
-                formatRupee(item.line_total),
-            ]
-                .forEach((value) => {
-                    const cell = document.createElement('td');
-                    cell.textContent = value;
-                    row.append(cell);
-                });
+            const productCell = document.createElement('td');
+            const productName = document.createElement('strong');
+            productName.textContent = item.name;
+            productCell.append(productName);
+
+            const mrpCell = document.createElement('td');
+            mrpCell.textContent = formatRupee(item.mrp);
+
+            const quantityCell = document.createElement('td');
+            const quantity = document.createElement('strong');
+            quantity.textContent = item.quantity;
+            quantityCell.append(quantity);
+
+            const salePriceCell = document.createElement('td');
+            salePriceCell.textContent = formatRupee(item.unit_price);
+
+            const totalCell = document.createElement('td');
+            totalCell.textContent = formatRupee(item.line_total);
+
+            row.append(productCell, mrpCell, quantityCell, salePriceCell, totalCell);
             receiptItems.append(row);
         });
 
@@ -671,6 +691,11 @@ if (posApp) {
             return;
         }
 
+        if (fulfillmentTypeInput.value === 'delivery' && !selectedCustomer?.address?.trim()) {
+            showMessage('Delivery requires selecting a customer with a saved address.');
+            return;
+        }
+
         if (paymentMethodInput.value === 'cash' && cashInput.value.trim() === '') {
             cashInput.reportValidity();
             showMessage('Enter the amount received in cash.');
@@ -678,6 +703,7 @@ if (posApp) {
         }
 
         const values = {
+            fulfillment_type: fulfillmentTypeInput.value,
             payment_method: paymentMethodInput.value,
             sales_manager_id: salesManagerInput.value,
         };
@@ -694,6 +720,7 @@ if (posApp) {
             printReceiptButton.hidden = false;
             cart = { items: [], total: 0, count: 0 };
             cashInput.value = '';
+            fulfillmentTypeInput.value = 'walk_in';
             paymentMethodInput.value = 'cash';
             selectCustomer(null);
             customerSearchInput.value = '';
@@ -714,6 +741,81 @@ if (posApp) {
 
     renderCart();
     barcodeInput.focus();
+}
+
+const saleEditForm = document.querySelector('#sale-edit-form');
+
+if (saleEditForm) {
+    const saleItemsList = saleEditForm.querySelector('#sale-items-list');
+    const saleItemTemplate = saleEditForm.querySelector('#sale-item-template');
+    const fulfillmentTypeInput = saleEditForm.querySelector('#sale-fulfillment-type');
+    const customerInput = saleEditForm.querySelector('#sale-customer');
+    const paymentMethodInput = saleEditForm.querySelector('#sale-payment-method');
+    const cashFields = saleEditForm.querySelector('#sale-cash-fields');
+    const cashReceivedInput = saleEditForm.querySelector('#sale-cash-received');
+
+    const updatePaymentFields = () => {
+        const isCash = paymentMethodInput.value === 'cash';
+        cashFields.hidden = !isCash;
+        cashReceivedInput.disabled = !isCash;
+        cashReceivedInput.required = isCash;
+        customerInput.required = paymentMethodInput.value === 'credit' || fulfillmentTypeInput.value === 'delivery';
+    };
+
+    const updateRemoveButtons = () => {
+        const removeButtons = saleItemsList.querySelectorAll('.remove-sale-item');
+        removeButtons.forEach((button) => {
+            button.disabled = removeButtons.length === 1;
+        });
+    };
+
+    const updatePriceLabel = (productSelect) => {
+        const priceLabel = productSelect.closest('.form-field').querySelector('[data-price-label]');
+        const selectedOption = productSelect.selectedOptions[0];
+        const unitPrice = selectedOption?.dataset.unitPrice;
+
+        priceLabel.textContent = unitPrice
+            ? `${selectedOption.dataset.priceLabel}: ₹${Number(unitPrice).toLocaleString('en-IN')}`
+            : 'Select a product to see its price.';
+    };
+
+    saleEditForm.querySelector('#add-sale-item').addEventListener('click', () => {
+        const index = Number.parseInt(saleItemsList.dataset.nextIndex, 10) || 0;
+        saleItemsList.dataset.nextIndex = String(index + 1);
+        const newRow = saleItemTemplate.content.cloneNode(true);
+
+        newRow.querySelectorAll('[id], [name], [for]').forEach((element) => {
+            ['id', 'name', 'for'].forEach((attribute) => {
+                const value = element.getAttribute(attribute);
+                if (value) {
+                    element.setAttribute(attribute, value.replaceAll('__INDEX__', String(index)));
+                }
+            });
+        });
+
+        saleItemsList.append(newRow);
+        updateRemoveButtons();
+    });
+
+    saleItemsList.addEventListener('change', (event) => {
+        if (event.target.matches('select[name^="items["]')) {
+            updatePriceLabel(event.target);
+        }
+    });
+
+    saleItemsList.addEventListener('click', (event) => {
+        const removeButton = event.target.closest('.remove-sale-item');
+        if (!removeButton || removeButton.disabled) return;
+
+        removeButton.closest('.sale-item-row').remove();
+        updateRemoveButtons();
+    });
+
+    fulfillmentTypeInput.addEventListener('change', updatePaymentFields);
+    paymentMethodInput.addEventListener('change', updatePaymentFields);
+    saleItemsList.querySelectorAll('select[name^="items["]').forEach(updatePriceLabel);
+    updateRemoveButtons();
+    updatePaymentFields();
 }
 
 const productForm = document.querySelector('#product-form');

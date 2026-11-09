@@ -151,6 +151,7 @@ class PosController extends Controller
     {
         $validated = $request->validate([
             'payment_method' => ['sometimes', 'required', 'string', 'in:cash,gpay,bank_transfer,credit'],
+            'fulfillment_type' => ['sometimes', 'required', 'string', 'in:walk_in,delivery'],
             'cash_received' => [
                 Rule::requiredIf(($request->input('payment_method') ?? 'cash') === 'cash'),
                 'integer',
@@ -161,7 +162,10 @@ class PosController extends Controller
             'customer_id' => [
                 'nullable',
                 'integer',
-                Rule::requiredIf($request->input('payment_method') === 'credit'),
+                Rule::requiredIf(
+                    ($request->input('payment_method') === 'credit')
+                    || (($request->input('fulfillment_type') ?? 'walk_in') === 'delivery'),
+                ),
                 'exists:customers,id',
             ],
             'customer_name' => ['nullable', 'string', 'max:120'],
@@ -210,6 +214,7 @@ class PosController extends Controller
             }
 
             $paymentMethod = $validated['payment_method'] ?? 'cash';
+            $fulfillmentType = $validated['fulfillment_type'] ?? 'walk_in';
             $customer = isset($validated['customer_id'])
                 ? Customer::query()->lockForUpdate()->find($validated['customer_id'])
                 : null;
@@ -223,6 +228,12 @@ class PosController extends Controller
             if ($paymentMethod === 'credit' && ! $customer) {
                 throw ValidationException::withMessages([
                     'customer_id' => 'Select a customer before recording a credit sale.',
+                ]);
+            }
+
+            if ($fulfillmentType === 'delivery' && ! trim($customer?->address ?? '')) {
+                throw ValidationException::withMessages([
+                    'customer_id' => 'Delivery sales require a customer with a saved address.',
                 ]);
             }
 
@@ -245,6 +256,7 @@ class PosController extends Controller
                 'sold_by_name' => $sellerName,
                 'customer_id' => $customer?->id,
                 'payment_method' => $paymentMethod,
+                'fulfillment_type' => $fulfillmentType,
                 'customer_name' => $customer?->name ?? ($validated['customer_name'] ?? null),
                 'customer_phone' => $customer?->phone ?? ($validated['customer_phone'] ?? null),
                 'customer_address' => $customer?->address ?? ($validated['customer_address'] ?? null),
@@ -276,6 +288,7 @@ class PosController extends Controller
                     'name' => $product->name,
                     'quantity' => $quantity,
                     'quantity_unit' => $product->quantity_unit,
+                    'mrp' => $product->mrp,
                     'unit_price' => $unitPrice,
                     'line_total' => $lineTotal,
                 ];
@@ -294,6 +307,7 @@ class PosController extends Controller
             'receipt_number' => $sale->receipt_number,
             'sales_manager_name' => $sale->sales_manager_name,
             'payment_method' => $sale->payment_method,
+            'fulfillment_type' => $sale->fulfillment_type,
             'customer_name' => $sale->customer_name,
             'customer_phone' => $sale->customer_phone,
             'customer_address' => $sale->customer_address,
@@ -331,6 +345,7 @@ class PosController extends Controller
                 'id' => $product->id,
                 'barcode' => $product->barcode,
                 'name' => $product->name,
+                'mrp' => $product->mrp,
                 'price' => $price,
                 'catalog_price' => $product->price,
                 'quantity' => $quantity,
