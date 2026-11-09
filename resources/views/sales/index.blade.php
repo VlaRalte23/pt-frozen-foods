@@ -12,6 +12,13 @@
         <a class="button button-primary sales-new-button" href="{{ route('pos.index') }}">New sale</a>
     </section>
 
+    @if (session('success'))
+        <div class="notice notice-success" role="status">{{ session('success') }}</div>
+    @endif
+    @if ($errors->any())
+        <div class="notice" role="alert">{{ $errors->first() }}</div>
+    @endif
+
     <section class="panel sales-list-panel">
         <div class="inventory-heading">
             <div>
@@ -36,6 +43,9 @@
                             <th>SALES MANAGER</th>
                             <th>PAYMENT</th>
                             <th>TOTAL</th>
+                            @if ($isOwner)
+                                <th>ACTIONS</th>
+                            @endif
                         </tr>
                     </thead>
                     <tbody>
@@ -71,6 +81,19 @@
                                     @endif
                                 </td>
                                 <td><strong>₹{{ number_format($sale->total, 0, '.', ',') }}</strong></td>
+                                @if ($isOwner)
+                                    <td>
+                                        <div class="customer-actions">
+                                            <a class="button button-secondary" href="{{ route('sales.edit', $sale) }}">Edit</a>
+                                            <form action="{{ route('sales.destroy', $sale) }}" method="POST"
+                                                onsubmit="return confirm('Permanently delete this sale? The sold stock will be returned to inventory, and sales, profit, and customer balances will be recalculated. This cannot be undone.')">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button class="button button-danger" type="submit">Delete</button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                @endif
                             </tr>
                         @endforeach
                     </tbody>

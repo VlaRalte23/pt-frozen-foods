@@ -40,6 +40,135 @@ class CustomerDebtWorkflowTest extends TestCase
         ]);
     }
 
+    public function test_manager_can_update_a_regular_customer(): void
+    {
+        $manager = User::factory()->create(['role' => 'manager']);
+        $customer = Customer::query()->create([
+            'name' => 'North Market',
+            'phone' => '08111111111',
+            'address' => 'Old address',
+        ]);
+        $this->actingAs($manager);
+
+        $this->get(route('customers.index'))
+            ->assertOk()
+            ->assertSee('Edit')
+            ->assertDontSee('Delete')
+            ->assertDontSee('Recycle Bin')
+            ->assertSee(route('customers.edit', $customer));
+        $this->get(route('customers.edit', $customer))
+            ->assertOk()
+            ->assertSee('Edit customer')
+            ->assertSee('North Market');
+
+        $this->put(route('customers.update', $customer), [
+            'name' => '  North Market Store  ',
+            'phone' => '08222222222',
+            'address' => 'New address',
+        ])->assertRedirect(route('customers.index'))
+            ->assertSessionHas('success', 'Customer details updated.');
+
+        $this->assertDatabaseHas('customers', [
+            'id' => $customer->id,
+            'name' => 'North Market Store',
+            'phone' => '08222222222',
+            'address' => 'New address',
+            'deleted_at' => null,
+        ]);
+    }
+
+    public function test_customer_update_rejects_a_missing_name(): void
+    {
+        $customer = Customer::query()->create([
+            'name' => 'North Market',
+            'phone' => '08111111111',
+        ]);
+        $this->actingAs(User::factory()->create(['role' => 'manager']));
+
+        $this->from(route('customers.edit', $customer))
+            ->put(route('customers.update', $customer), [
+                'name' => '',
+                'phone' => '08222222222',
+            ])
+            ->assertRedirect(route('customers.edit', $customer))
+            ->assertSessionHasErrors('name');
+
+        $this->assertDatabaseHas('customers', [
+            'id' => $customer->id,
+            'name' => 'North Market',
+            'phone' => '08111111111',
+            'deleted_at' => null,
+        ]);
+    }
+
+    public function test_deleted_customers_are_kept_in_recycle_bin_and_can_be_restored(): void
+    {
+        $seller = User::factory()->create(['role' => 'manager']);
+        $owner = User::factory()->create(['role' => 'owner']);
+        $customer = Customer::query()->create(['name' => 'North Market']);
+        $sale = $this->createCreditSale($customer, $seller);
+        $payment = CustomerPayment::query()->create([
+            'customer_id' => $customer->id,
+            'sale_id' => $sale->id,
+            'user_id' => $seller->id,
+            'amount' => 250,
+            'payment_method' => 'cash',
+        ]);
+        $this->actingAs($owner);
+
+        $this->delete(route('customers.destroy', $customer))
+            ->assertRedirect(route('customers.index'))
+            ->assertSessionHas('success', 'Customer moved to the Recycle Bin. Sales and payment history are kept.');
+
+        $this->assertSoftDeleted($customer);
+        $this->assertModelExists($sale);
+        $this->assertModelExists($payment);
+        $this->assertSame(0, Customer::query()->count());
+
+        $this->get(route('customers.index'))
+            ->assertOk()
+            ->assertSee('Recycle Bin')
+            ->assertSee('North Market')
+            ->assertSee('₹750')
+            ->assertSee(route('customers.restore', $customer->id));
+        $this->getJson(route('customers.search', ['q' => 'North']))
+            ->assertOk()
+            ->assertJsonCount(0, 'customers');
+
+        $this->post(route('customers.restore', $customer->id))
+            ->assertRedirect(route('customers.index'))
+            ->assertSessionHas('success', 'Customer restored.');
+
+        $this->assertDatabaseHas('customers', [
+            'id' => $customer->id,
+            'name' => 'North Market',
+            'deleted_at' => null,
+        ]);
+        $this->assertModelExists($sale);
+        $this->assertModelExists($payment);
+    }
+
+    public function test_only_owners_can_delete_or_restore_customers(): void
+    {
+        $customer = Customer::query()->create(['name' => 'North Market']);
+        $deletedCustomer = Customer::query()->create(['name' => 'Archived Market']);
+        $deletedCustomer->delete();
+        $this->actingAs(User::factory()->create(['role' => 'manager']));
+
+        $this->delete(route('customers.destroy', $customer))->assertForbidden();
+        $this->post(route('customers.restore', $deletedCustomer->id))->assertForbidden();
+
+        $this->assertModelExists($customer);
+        $this->assertSoftDeleted($deletedCustomer);
+
+        $this->actingAs(User::factory()->create(['role' => 'owner']))
+            ->get(route('customers.index'))
+            ->assertOk()
+            ->assertSee('Delete')
+            ->assertSee('Recycle Bin')
+            ->assertSee('Archived Market');
+    }
+
     public function test_credit_checkout_requires_a_regular_customer(): void
     {
         $seller = User::factory()->create(['role' => 'manager']);
@@ -234,6 +363,10 @@ class CustomerDebtWorkflowTest extends TestCase
 
         $this->get(route('customers.index'))->assertRedirect(route('login'));
         $this->get(route('customers.show', $customer))->assertRedirect(route('login'));
+        $this->get(route('customers.edit', $customer))->assertRedirect(route('login'));
+        $this->put(route('customers.update', $customer), ['name' => 'Changed'])->assertRedirect(route('login'));
+        $this->delete(route('customers.destroy', $customer))->assertRedirect(route('login'));
+        $this->post(route('customers.restore', $customer->id))->assertRedirect(route('login'));
         $this->getJson(route('customers.search', ['q' => 'North']))->assertUnauthorized();
         $this->postJson(route('customers.store'), ['name' => 'New customer'])->assertUnauthorized();
     }
@@ -259,6 +392,8 @@ class CustomerDebtWorkflowTest extends TestCase
         $migration->down();
 
         $migration->up();
+        $softDeletesMigration = require database_path('migrations/2026_11_09_221204_add_soft_deletes_to_customers_table.php');
+        $softDeletesMigration->up();
 
         $customer = Customer::query()->where('name', 'Legacy Shop')->firstOrFail();
         $this->assertSame($customer->id, $sale->fresh()->customer_id);
