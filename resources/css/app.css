@@ -184,14 +184,6 @@ h1, h2, p { margin-top: 0; }
 .customer-balance-due { color: #b34d3e !important; }
 .customers-list-panel, .customer-history-panel { min-width: 0; overflow: hidden; margin-bottom: 20px; }
 .customers-table { min-width: 960px; }
-.customer-actions { display: flex; align-items: center; gap: 7px; }
-.customer-actions form { margin: 0; }
-.customer-actions .button, .recycle-bin-panel .button { min-height: 32px; padding: 0 10px; font-size: 10px; }
-.button-danger { color: #a94235; background: #fff3f1; }
-.button-danger:hover { color: #8e3026; background: #fce4e0; }
-.recycle-bin-panel { border-color: #e7e9e7; }
-.customer-edit-panel { max-width: 560px; padding: 23px; }
-.customer-edit-actions { display: flex; gap: 9px; }
 .customer-balance-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 20px; }
 .customer-balance-card { min-width: 0; display: flex; flex-direction: column; gap: 8px; padding: 18px; }
 .customer-balance-card span { color: #839087; font-size: 8px; font-weight: 800; letter-spacing: .8px; }
@@ -338,17 +330,6 @@ h1, h2, p { margin-top: 0; }
 .sales-products-cell { min-width: 180px; white-space: normal !important; }
 .sales-products-cell > span { display: block; margin-bottom: 4px; }
 .sales-products-cell > span:last-child { margin-bottom: 0; }
-.sale-edit-panel { padding: 23px; }
-.sale-edit-section + .sale-edit-section { margin-top: 25px; padding-top: 22px; border-top: 1px solid #eef1ed; }
-.sale-edit-section .inventory-heading { padding: 0 0 16px; }
-.sale-items-list { display: grid; gap: 12px; }
-.sale-item-row { display: grid; grid-template-columns: minmax(0, 1fr) 150px auto; align-items: end; gap: 12px; padding: 14px; background: #f8faf8; border: 1px solid #edf1ed; border-radius: 9px; }
-.sale-item-row .form-field { margin-bottom: 0; }
-.sale-item-row .button { min-height: 42px; margin-bottom: 0; }
-.sale-line-price { display: block; margin-top: 6px; color: #78857e; font-size: 10px; }
-.sale-edit-actions { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 24px; }
-.sale-edit-actions .button { min-height: 42px; text-decoration: none; }
-.sale-edit-section #sale-cash-fields[hidden] { display: none; }
 .pagination-wrap { padding: 14px 20px; border-top: 1px solid #eef1ed; font-size: 11px; }
 .pagination-wrap nav { display: flex; justify-content: space-between; }
 .pagination-wrap p { margin: 0; color: #829088; }
@@ -480,9 +461,6 @@ h1, h2, p { margin-top: 0; }
     .stock-filters input { flex-basis: 100%; }
     .low-stock-alert { align-items: flex-start; padding: 12px; }
     .low-stock-alert > a { align-self: center; font-size: 9px; }
-    .sale-edit-panel { padding: 18px; }
-    .sale-item-row { grid-template-columns: minmax(0, 1fr) 105px; gap: 9px; padding: 11px; }
-    .sale-item-row .remove-sale-item { grid-column: 1 / -1; }
 }
 
 @media (max-width: 430px) {
@@ -503,6 +481,4 @@ h1, h2, p { margin-top: 0; }
     .logout-button { padding: 5px 6px; }
     .login-panel { padding: 26px 21px; }
     .profit-card { padding: 15px 11px; }
-    .sale-edit-section .inventory-heading { align-items: flex-start; gap: 10px; }
-    .sale-edit-section .inventory-heading .button { min-height: 36px; padding: 0 10px; font-size: 10px; }
 }

@@ -31,29 +31,9 @@ class CustomerController extends Controller
             ->withSum('payments as payments_total', 'amount')
             ->orderBy('name')
             ->paginate(25);
-        $deletedCustomers = null;
-
-        if (request()->user()->isOwner()) {
-            $deletedCustomers = Customer::onlyTrashed()
-                ->withSum(['sales as credit_sales_total' => function (Builder $query): void {
-                    $query->where('payment_method', 'credit');
-                }], 'total')
-                ->withSum('payments as payments_total', 'amount')
-                ->orderByDesc('deleted_at')
-                ->paginate(10, ['*'], 'recycle_page');
-        }
 
         return view('customers.index', [
             'customers' => $customers,
-            'deletedCustomers' => $deletedCustomers,
-            'isOwner' => request()->user()->isOwner(),
-        ]);
-    }
-
-    public function edit(Customer $customer): View
-    {
-        return view('customers.edit', [
-            'customer' => $customer,
         ]);
     }
 
@@ -112,42 +92,6 @@ class CustomerController extends Controller
         return response()->json([
             'customer' => $customer->only(['id', 'name', 'phone', 'address']),
         ], 201);
-    }
-
-    public function update(Request $request, Customer $customer): RedirectResponse
-    {
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:120'],
-            'phone' => ['nullable', 'string', 'max:30'],
-            'address' => ['nullable', 'string', 'max:500'],
-        ]);
-
-        $customer->update([
-            'name' => trim($validated['name']),
-            'phone' => isset($validated['phone']) ? trim($validated['phone']) : null,
-            'address' => isset($validated['address']) ? trim($validated['address']) : null,
-        ]);
-
-        return redirect()->route('customers.index')->with('success', 'Customer details updated.');
-    }
-
-    public function destroy(Customer $customer): RedirectResponse
-    {
-        abort_unless(request()->user()->isOwner(), 403);
-
-        $customer->delete();
-
-        return redirect()->route('customers.index')->with('success', 'Customer moved to the Recycle Bin. Sales and payment history are kept.');
-    }
-
-    public function restore(string $customerId): RedirectResponse
-    {
-        abort_unless(request()->user()->isOwner(), 403);
-
-        $customer = Customer::withTrashed()->findOrFail($customerId);
-        $customer->restore();
-
-        return redirect()->route('customers.index')->with('success', 'Customer restored.');
     }
 
     public function recordPayment(Request $request, Customer $customer): RedirectResponse
