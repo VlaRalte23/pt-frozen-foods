@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Customer;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -126,9 +127,9 @@ class AuthWorkflowTest extends TestCase
         $this->actingAs(User::factory()->create(['role' => 'owner']))
             ->get(route('users.index'))
             ->assertOk()
-            ->assertSee('Create an owner account')
-            ->assertSee('Existing store manager accounts can still sign in.')
-            ->assertDontSee('Store manager — sell and manage stock');
+            ->assertSee('Create a user account')
+            ->assertSee('Sales manager — sell, sales list, and stock')
+            ->assertSee('Owner — full access');
 
         $this->post(route('users.store'), [
             'name' => 'New Owner',
@@ -160,6 +161,69 @@ class AuthWorkflowTest extends TestCase
             ->assertSessionHasErrors('role');
 
         $this->assertDatabaseMissing('users', ['email' => 'new.manager@example.test']);
+    }
+
+    public function test_owner_can_create_a_sales_manager_account(): void
+    {
+        $this->actingAs(User::factory()->create(['role' => 'owner']))
+            ->post(route('users.store'), [
+                'name' => 'Sales Manager Nia',
+                'email' => 'sales.manager@example.test',
+                'role' => 'sales_manager',
+                'password' => 'manager-password-123',
+                'password_confirmation' => 'manager-password-123',
+            ])
+            ->assertRedirect(route('users.index'))
+            ->assertSessionHas('success', 'User account created.');
+
+        $user = User::query()->where('email', 'sales.manager@example.test')->firstOrFail();
+        $this->assertSame('sales_manager', $user->role);
+        $this->assertTrue(password_verify('manager-password-123', $user->password));
+
+        $this->get(route('users.index'))
+            ->assertOk()
+            ->assertSee('Sales Manager Nia')
+            ->assertSee('Sales manager');
+    }
+
+    public function test_sales_manager_account_can_access_only_sell_sales_list_and_stock_pages(): void
+    {
+        $salesManager = User::factory()->create(['role' => 'sales_manager']);
+        $customer = Customer::query()->create(['name' => 'North Market']);
+        $this->actingAs($salesManager);
+
+        $this->get(route('pos.index'))->assertOk()->assertSee('Ready to sell');
+        $this->get(route('sales.index'))
+            ->assertOk()
+            ->assertSee('Sales List')
+            ->assertDontSee(route('customers.show', $customer));
+        $this->get(route('products.index'))
+            ->assertOk()
+            ->assertSee('Stock room')
+            ->assertDontSee('PRODUCT COST');
+        $this->getJson(route('customers.search', ['q' => 'North']))
+            ->assertOk()
+            ->assertJsonPath('customers.0.name', 'North Market');
+        $this->postJson(route('customers.store'), [
+            'name' => 'POS Customer',
+            'phone' => '08123456789',
+        ])->assertCreated()
+            ->assertJsonPath('customer.name', 'POS Customer');
+
+        $this->get(route('customers.index'))->assertForbidden();
+        $this->get(route('customers.show', $customer))->assertForbidden();
+        $this->get(route('profits.index'))->assertForbidden();
+        $this->get(route('manager-performance.index'))->assertForbidden();
+        $this->get(route('sales-managers.index'))->assertForbidden();
+        $this->get(route('users.index'))->assertForbidden();
+
+        $this->get(route('pos.index'))
+            ->assertOk()
+            ->assertDontSee('Customers &amp; Debts')
+            ->assertDontSee('Profit')
+            ->assertDontSee('Manager Performance')
+            ->assertDontSee('Sales Managers')
+            ->assertDontSee('Users');
     }
 
     public function test_manager_cannot_open_user_management_or_create_users(): void

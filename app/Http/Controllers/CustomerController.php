@@ -34,6 +34,7 @@ class CustomerController extends Controller
 
         return view('customers.index', [
             'customers' => $customers,
+            'isOwner' => request()->user()->isOwner(),
         ]);
     }
 
@@ -51,6 +52,14 @@ class CustomerController extends Controller
             'payments' => $customer->payments()->with(['sale', 'recorder'])->latest()->paginate(20, ['*'], 'payments_page'),
             'creditTotal' => (int) $customer->sales()->where('payment_method', 'credit')->sum('total'),
             'paidTotal' => (int) $customer->payments()->sum('amount'),
+            'isOwner' => request()->user()->isOwner(),
+        ]);
+    }
+
+    public function edit(Customer $customer): View
+    {
+        return view('customers.edit', [
+            'customer' => $customer,
         ]);
     }
 
@@ -94,6 +103,23 @@ class CustomerController extends Controller
         ], 201);
     }
 
+    public function update(Request $request, Customer $customer): RedirectResponse
+    {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:120'],
+            'phone' => ['nullable', 'string', 'max:30'],
+            'address' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $customer->update([
+            'name' => trim($validated['name']),
+            'phone' => isset($validated['phone']) && trim($validated['phone']) !== '' ? trim($validated['phone']) : null,
+            'address' => isset($validated['address']) && trim($validated['address']) !== '' ? trim($validated['address']) : null,
+        ]);
+
+        return redirect()->route('customers.show', $customer)->with('success', 'Customer details updated.');
+    }
+
     public function recordPayment(Request $request, Customer $customer): RedirectResponse
     {
         $validated = $request->validate([
@@ -135,5 +161,54 @@ class CustomerController extends Controller
         });
 
         return redirect()->route('customers.show', $customer)->with('success', 'Customer payment recorded.');
+    }
+
+    public function updatePayment(Request $request, Customer $customer, CustomerPayment $payment): RedirectResponse
+    {
+        if ((int) $payment->customer_id !== (int) $customer->id) {
+            abort(404);
+        }
+
+        $validated = $request->validate([
+            'amount' => ['required', 'integer', 'min:1', 'max:999999999999'],
+            'payment_method' => ['required', 'string', 'in:cash,gpay,bank_transfer'],
+        ]);
+
+        DB::transaction(function () use ($validated, $customer, $payment): void {
+            $sale = Sale::query()
+                ->whereKey($payment->sale_id)
+                ->where('customer_id', $customer->id)
+                ->where('payment_method', 'credit')
+                ->lockForUpdate()
+                ->first();
+
+            if (! $sale) {
+                abort(404);
+            }
+
+            $lockedPayment = CustomerPayment::query()
+                ->whereKey($payment->id)
+                ->where('customer_id', $customer->id)
+                ->where('sale_id', $sale->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            $otherPaymentsTotal = (int) $sale->customerPayments()
+                ->where('id', '!=', $lockedPayment->id)
+                ->sum('amount');
+            $maximumPayment = $sale->total - $otherPaymentsTotal;
+
+            if ($validated['amount'] > $maximumPayment) {
+                throw ValidationException::withMessages([
+                    'amount' => 'Payment cannot be more than the remaining balance of ₹'.number_format($maximumPayment, 0, '.', ',').'.',
+                ]);
+            }
+
+            $lockedPayment->update([
+                'amount' => $validated['amount'],
+                'payment_method' => $validated['payment_method'],
+            ]);
+        });
+
+        return redirect()->route('customers.show', $customer)->with('success', 'Debt repayment updated.');
     }
 }

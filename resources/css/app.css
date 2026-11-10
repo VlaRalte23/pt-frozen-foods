@@ -191,6 +191,17 @@ h1, h2, p { margin-top: 0; }
 .customer-balance-highlight { border-color: #f1d8d1; background: #fff8f6; }
 .customer-balance-highlight strong { color: #a94235; }
 .customer-history-table { min-width: 850px; }
+.customer-edit-panel { max-width: 560px; padding: 23px; }
+.customer-edit-panel textarea { width: 100%; min-height: 84px; padding: 10px 11px; color: var(--ink); background: #fff; border: 1px solid #e0e7e1; border-radius: 8px; outline: 0; font: inherit; font-size: 12px; resize: vertical; }
+.customer-edit-panel textarea:focus { border-color: #64a987; box-shadow: 0 0 0 3px rgb(21 123 85 / 8%); }
+.customer-edit-actions, .customer-page-actions { display: flex; flex-wrap: wrap; gap: 9px; }
+.customer-edit-actions .button, .customer-page-actions .button { min-height: 40px; text-decoration: none; }
+.debt-payment-edit { display: grid; justify-items: start; gap: 8px; min-width: 170px; }
+.debt-payment-edit summary { min-height: 32px; padding: 0 10px; cursor: pointer; list-style: none; }
+.debt-payment-edit summary::-webkit-details-marker { display: none; }
+.debt-payment-edit-form { display: grid; gap: 7px; min-width: 170px; }
+.debt-payment-edit-form input, .debt-payment-edit-form select { width: 100%; min-width: 0; height: 34px; padding: 0 8px; color: var(--ink); background: #fff; border: 1px solid #e0e7e1; border-radius: 6px; font-size: 10px; }
+.debt-payment-edit-form .button { min-height: 34px; padding: 0 8px; font-size: 10px; }
 .sale-edit-panel { padding: 23px; }
 .sale-edit-section + .sale-edit-section { margin-top: 25px; padding-top: 22px; border-top: 1px solid #eef1ed; }
 .sale-edit-section .inventory-heading { padding: 0 0 16px; }
@@ -477,6 +488,8 @@ h1, h2, p { margin-top: 0; }
     .low-stock-alert { align-items: flex-start; padding: 12px; }
     .low-stock-alert > a { align-self: center; font-size: 9px; }
     .sale-edit-panel { padding: 18px; }
+    .customer-edit-panel { padding: 18px; }
+    .customer-page-actions { width: 100%; }
     .sale-item-row { grid-template-columns: minmax(0, 1fr) 105px; gap: 9px; padding: 11px; }
     .sale-item-row .remove-sale-item { grid-column: 1 / -1; }
 }

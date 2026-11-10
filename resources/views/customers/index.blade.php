@@ -28,7 +28,18 @@
         <div class="table-wrap">
             <table class="inventory-table customers-table">
                 <thead>
-                    <tr><th>CUSTOMER</th><th>PHONE</th><th>SALES</th><th>RECENT PURCHASES</th><th>TOTAL CREDIT</th><th>PAID</th><th>BALANCE DUE</th></tr>
+                    <tr>
+                        <th>CUSTOMER</th>
+                        <th>PHONE</th>
+                        <th>SALES</th>
+                        <th>RECENT PURCHASES</th>
+                        <th>TOTAL CREDIT</th>
+                        <th>PAID</th>
+                        <th>BALANCE DUE</th>
+                        @if ($isOwner)
+                            <th>ACTIONS</th>
+                        @endif
+                    </tr>
                 </thead>
                 <tbody>
                     @foreach ($customers as $customer)
@@ -60,6 +71,11 @@
                             <td>₹{{ number_format($creditTotal, 0, '.', ',') }}</td>
                             <td>₹{{ number_format($paidTotal, 0, '.', ',') }}</td>
                             <td><strong class="{{ $creditTotal > $paidTotal ? 'customer-balance-due' : '' }}">₹{{ number_format(max(0, $creditTotal - $paidTotal), 0, '.', ',') }}</strong></td>
+                            @if ($isOwner)
+                                <td>
+                                    <a class="button button-secondary" href="{{ route('customers.edit', $customer) }}">Edit</a>
+                                </td>
+                            @endif
                         </tr>
                     @endforeach
                 </tbody>

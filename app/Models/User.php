@@ -23,6 +23,11 @@ class User extends Authenticatable
         return $this->role === 'owner';
     }
 
+    public function isSalesManager(): bool
+    {
+        return $this->role === 'sales_manager';
+    }
+
     public function expenses(): HasMany
     {
         return $this->hasMany(Expense::class, 'created_by');

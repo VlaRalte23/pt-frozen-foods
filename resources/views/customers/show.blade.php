@@ -9,7 +9,12 @@
         <h1>{{ $customer->name }}</h1>
         <p class="subheading">{{ $customer->phone ?? 'No phone number' }}@if ($customer->address) · {{ $customer->address }}@endif</p>
     </div>
-    <a class="button button-secondary sales-new-button" href="{{ route('customers.index') }}">All customers</a>
+    <div class="customer-page-actions">
+        @if ($isOwner)
+            <a class="button button-secondary" href="{{ route('customers.edit', $customer) }}">Edit customer</a>
+        @endif
+        <a class="button button-secondary" href="{{ route('customers.index') }}">All customers</a>
+    </div>
 </section>
 
 @if (session('success'))
@@ -110,7 +115,18 @@
     @else
         <div class="table-wrap">
             <table class="inventory-table">
-                <thead><tr><th>DATE</th><th>RECEIPT</th><th>RECORDED BY</th><th>METHOD</th><th>AMOUNT</th></tr></thead>
+                <thead>
+                    <tr>
+                        <th>DATE</th>
+                        <th>RECEIPT</th>
+                        <th>RECORDED BY</th>
+                        <th>METHOD</th>
+                        <th>AMOUNT</th>
+                        @if ($isOwner)
+                            <th>ACTIONS</th>
+                        @endif
+                    </tr>
+                </thead>
                 <tbody>
                     @foreach ($payments as $payment)
                         <tr>
@@ -119,6 +135,27 @@
                             <td>{{ $payment->recorder?->name ?? 'Former user' }}</td>
                             <td>{{ ucfirst(str_replace('_', ' ', $payment->payment_method)) }}</td>
                             <td><strong>₹{{ number_format($payment->amount, 0, '.', ',') }}</strong></td>
+                            @if ($isOwner)
+                                <td>
+                                    <details class="debt-payment-edit">
+                                        <summary class="button button-secondary">Edit</summary>
+                                        <form class="debt-payment-edit-form" action="{{ route('customers.payments.update', [$customer, $payment]) }}" method="POST">
+                                            @csrf
+                                            @method('PUT')
+                                            <label class="sr-only" for="edit-payment-amount-{{ $payment->id }}">Repayment amount</label>
+                                            <input id="edit-payment-amount-{{ $payment->id }}" name="amount" type="number" min="1"
+                                                max="{{ $payment->sale?->total ?? $payment->amount }}" value="{{ $payment->amount }}" required>
+                                            <label class="sr-only" for="edit-payment-method-{{ $payment->id }}">Repayment method</label>
+                                            <select id="edit-payment-method-{{ $payment->id }}" name="payment_method" required>
+                                                <option value="cash" @selected($payment->payment_method === 'cash')>Cash</option>
+                                                <option value="gpay" @selected($payment->payment_method === 'gpay')>GPay</option>
+                                                <option value="bank_transfer" @selected($payment->payment_method === 'bank_transfer')>Bank transfer</option>
+                                            </select>
+                                            <button class="button button-primary" type="submit">Save payment</button>
+                                        </form>
+                                    </details>
+                                </td>
+                            @endif
                         </tr>
                     @endforeach
                 </tbody>

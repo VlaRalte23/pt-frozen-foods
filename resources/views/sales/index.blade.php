@@ -56,7 +56,7 @@
                                     <span class="sales-secondary">{{ $sale->receipt_number ?? 'No receipt number' }}</span>
                                 </td>
                                 <td>
-                                    @if ($sale->customer)
+                                    @if ($sale->customer && $canViewCustomers)
                                         <a class="customer-history-link" href="{{ route('customers.show', $sale->customer) }}">{{ $sale->customer_name }}</a>
                                     @else
                                         <strong>{{ $sale->customer_name ?? 'Walk-in' }}</strong>

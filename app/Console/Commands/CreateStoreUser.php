@@ -14,14 +14,14 @@ class CreateStoreUser extends Command
 {
     protected $signature = 'app:user:create';
 
-    protected $description = 'Create a store manager or owner login';
+    protected $description = 'Create a sales manager or owner login';
 
     public function handle(): int
     {
         $name = trim(text('Name'));
         $email = strtolower(trim(text('Email')));
         $role = select('Role', [
-            'manager' => 'Store manager',
+            'sales_manager' => 'Sales manager',
             'owner' => 'Owner',
         ]);
         $password = password('Password (at least 12 characters)');

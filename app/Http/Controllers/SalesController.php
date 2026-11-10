@@ -22,6 +22,7 @@ class SalesController extends Controller
                 ->latest()
                 ->paginate(20),
             'isOwner' => request()->user()->isOwner(),
+            'canViewCustomers' => ! request()->user()->isSalesManager(),
         ]);
     }
 

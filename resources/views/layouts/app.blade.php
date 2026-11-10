@@ -18,7 +18,9 @@
                 <nav class="main-nav" aria-label="Main navigation">
                     <a class="{{ request()->routeIs('pos.*', 'cart.*') ? 'active' : '' }}" href="{{ route('pos.index') }}">Sell</a>
                     <a class="{{ request()->routeIs('sales.index') ? 'active' : '' }}" href="{{ route('sales.index') }}">Sales List</a>
-                    <a class="{{ request()->routeIs('customers.*') ? 'active' : '' }}" href="{{ route('customers.index') }}">Customers &amp; Debts</a>
+                    @unless (auth()->user()->isSalesManager())
+                        <a class="{{ request()->routeIs('customers.*') ? 'active' : '' }}" href="{{ route('customers.index') }}">Customers &amp; Debts</a>
+                    @endunless
                     <a class="{{ request()->routeIs('products.*') ? 'active' : '' }}" href="{{ route('products.index') }}">Stock</a>
                     @if (auth()->user()->isOwner())
                         <a class="{{ request()->routeIs('profits.*') ? 'active' : '' }}" href="{{ route('profits.index') }}">Profit</a>

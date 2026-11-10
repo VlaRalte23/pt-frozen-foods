@@ -25,9 +25,6 @@ Route::middleware('auth')->group(function () {
     Route::get('/sales', [SalesController::class, 'index'])->name('sales.index');
     Route::get('/customers/search', [CustomerController::class, 'search'])->name('customers.search');
     Route::post('/customers', [CustomerController::class, 'store'])->name('customers.store');
-    Route::get('/customers', [CustomerController::class, 'index'])->name('customers.index');
-    Route::get('/customers/{customer}', [CustomerController::class, 'show'])->name('customers.show');
-    Route::post('/customers/{customer}/payments', [CustomerController::class, 'recordPayment'])->name('customers.payments.store');
     Route::get('/cart/products', [PosController::class, 'searchProducts'])->name('cart.products.search');
     Route::post('/cart/items', [PosController::class, 'addItem'])->name('cart.items.add');
     Route::patch('/cart/items/{product}', [PosController::class, 'updateItem'])->name('cart.items.update');
@@ -38,10 +35,19 @@ Route::middleware('auth')->group(function () {
     Route::get('/products/lookup', [ProductController::class, 'lookup'])->name('products.lookup');
     Route::post('/products', [ProductController::class, 'store'])->name('products.store');
 
+    Route::middleware('role:owner,manager')->group(function () {
+        Route::get('/customers', [CustomerController::class, 'index'])->name('customers.index');
+        Route::get('/customers/{customer}', [CustomerController::class, 'show'])->name('customers.show');
+        Route::post('/customers/{customer}/payments', [CustomerController::class, 'recordPayment'])->name('customers.payments.store');
+    });
+
     Route::middleware('role:owner')->group(function () {
         Route::get('/sales/{sale}/edit', [SalesController::class, 'edit'])->name('sales.edit');
         Route::put('/sales/{sale}', [SalesController::class, 'update'])->name('sales.update');
         Route::delete('/sales/{sale}', [SalesController::class, 'destroy'])->name('sales.destroy');
+        Route::get('/customers/{customer}/edit', [CustomerController::class, 'edit'])->name('customers.edit');
+        Route::put('/customers/{customer}', [CustomerController::class, 'update'])->name('customers.update');
+        Route::put('/customers/{customer}/payments/{payment}', [CustomerController::class, 'updatePayment'])->name('customers.payments.update');
         Route::get('/sales-managers', [SalesManagerController::class, 'index'])->name('sales-managers.index');
         Route::post('/sales-managers', [SalesManagerController::class, 'store'])->name('sales-managers.store');
         Route::patch('/sales-managers/{salesManager}', [SalesManagerController::class, 'update'])->name('sales-managers.update');

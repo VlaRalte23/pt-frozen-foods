@@ -189,6 +189,223 @@ class CustomerDebtWorkflowTest extends TestCase
             ->assertSee('Due ₹750');
     }
 
+    public function test_owner_can_edit_customer_details_without_changing_historical_sale_snapshots(): void
+    {
+        $owner = User::factory()->create(['role' => 'owner']);
+        $customer = Customer::query()->create([
+            'name' => 'North Market',
+            'phone' => '08111111111',
+            'address' => 'Old address',
+        ]);
+        $sale = $this->createCreditSale($customer, User::factory()->create(['role' => 'manager']));
+        $this->actingAs($owner);
+
+        $this->get(route('customers.index'))
+            ->assertOk()
+            ->assertSee(route('customers.edit', $customer));
+
+        $this->get(route('customers.edit', $customer))
+            ->assertOk()
+            ->assertSee('Edit customer')
+            ->assertSee('North Market');
+
+        $this->put(route('customers.update', $customer), [
+            'name' => '  North Market Store ',
+            'phone' => ' 08122222222 ',
+            'address' => ' New address ',
+        ])
+            ->assertRedirect(route('customers.show', $customer))
+            ->assertSessionHas('success', 'Customer details updated.');
+
+        $this->assertDatabaseHas('customers', [
+            'id' => $customer->id,
+            'name' => 'North Market Store',
+            'phone' => '08122222222',
+            'address' => 'New address',
+        ]);
+        $this->assertDatabaseHas('sales', [
+            'id' => $sale->id,
+            'customer_name' => 'North Market',
+            'customer_phone' => '08111111111',
+            'customer_address' => 'Old address',
+        ]);
+    }
+
+    public function test_owner_can_edit_a_repayment_and_customer_balance_updates(): void
+    {
+        $owner = User::factory()->create(['role' => 'owner']);
+        $customer = Customer::query()->create(['name' => 'North Market']);
+        $sale = $this->createCreditSale($customer, User::factory()->create(['role' => 'manager']));
+        $payment = CustomerPayment::query()->create([
+            'customer_id' => $customer->id,
+            'sale_id' => $sale->id,
+            'user_id' => $owner->id,
+            'amount' => 300,
+            'payment_method' => 'cash',
+        ]);
+        CustomerPayment::query()->create([
+            'customer_id' => $customer->id,
+            'sale_id' => $sale->id,
+            'user_id' => $owner->id,
+            'amount' => 200,
+            'payment_method' => 'gpay',
+        ]);
+        $this->actingAs($owner);
+
+        $this->get(route('customers.show', $customer))
+            ->assertOk()
+            ->assertSee(route('customers.payments.update', [$customer, $payment]))
+            ->assertSee('Edit customer');
+
+        $this->put(route('customers.payments.update', [$customer, $payment]), [
+            'amount' => 400,
+            'payment_method' => 'bank_transfer',
+        ])
+            ->assertRedirect(route('customers.show', $customer))
+            ->assertSessionHas('success', 'Debt repayment updated.');
+
+        $this->assertDatabaseHas('customer_payments', [
+            'id' => $payment->id,
+            'customer_id' => $customer->id,
+            'sale_id' => $sale->id,
+            'user_id' => $owner->id,
+            'amount' => 400,
+            'payment_method' => 'bank_transfer',
+        ]);
+        $this->get(route('customers.show', $customer))
+            ->assertOk()
+            ->assertSee('BALANCE DUE')
+            ->assertSee('₹400');
+    }
+
+    public function test_repayment_edit_cannot_exceed_the_remaining_sale_balance(): void
+    {
+        $owner = User::factory()->create(['role' => 'owner']);
+        $customer = Customer::query()->create(['name' => 'North Market']);
+        $sale = $this->createCreditSale($customer, User::factory()->create(['role' => 'manager']));
+        $payment = CustomerPayment::query()->create([
+            'customer_id' => $customer->id,
+            'sale_id' => $sale->id,
+            'user_id' => $owner->id,
+            'amount' => 400,
+            'payment_method' => 'cash',
+        ]);
+        CustomerPayment::query()->create([
+            'customer_id' => $customer->id,
+            'sale_id' => $sale->id,
+            'user_id' => $owner->id,
+            'amount' => 300,
+            'payment_method' => 'gpay',
+        ]);
+        $this->actingAs($owner);
+
+        $this->from(route('customers.show', $customer))
+            ->put(route('customers.payments.update', [$customer, $payment]), [
+                'amount' => 701,
+                'payment_method' => 'bank_transfer',
+            ])
+            ->assertRedirect(route('customers.show', $customer))
+            ->assertSessionHasErrors([
+                'amount' => 'Payment cannot be more than the remaining balance of ₹700.',
+            ]);
+
+        $this->assertDatabaseHas('customer_payments', [
+            'id' => $payment->id,
+            'amount' => 400,
+            'payment_method' => 'cash',
+        ]);
+    }
+
+    public function test_repayment_cannot_be_edited_through_another_customer_account(): void
+    {
+        $owner = User::factory()->create(['role' => 'owner']);
+        $customer = Customer::query()->create(['name' => 'North Market']);
+        $otherCustomer = Customer::query()->create(['name' => 'South Market']);
+        $sale = $this->createCreditSale($customer, User::factory()->create(['role' => 'manager']));
+        $payment = CustomerPayment::query()->create([
+            'customer_id' => $customer->id,
+            'sale_id' => $sale->id,
+            'user_id' => $owner->id,
+            'amount' => 300,
+            'payment_method' => 'cash',
+        ]);
+        $this->actingAs($owner);
+
+        $this->put(route('customers.payments.update', [$otherCustomer, $payment]), [
+            'amount' => 500,
+            'payment_method' => 'gpay',
+        ])->assertNotFound();
+
+        $this->assertDatabaseHas('customer_payments', [
+            'id' => $payment->id,
+            'customer_id' => $customer->id,
+            'amount' => 300,
+            'payment_method' => 'cash',
+        ]);
+    }
+
+    public function test_customer_update_rejects_an_empty_name_without_changing_details(): void
+    {
+        $owner = User::factory()->create(['role' => 'owner']);
+        $customer = Customer::query()->create([
+            'name' => 'North Market',
+            'phone' => '08111111111',
+        ]);
+
+        $this->actingAs($owner)
+            ->from(route('customers.edit', $customer))
+            ->put(route('customers.update', $customer), [
+                'name' => '',
+                'phone' => '08122222222',
+            ])
+            ->assertRedirect(route('customers.edit', $customer))
+            ->assertSessionHasErrors([
+                'name' => 'The name field is required.',
+            ]);
+
+        $this->assertDatabaseHas('customers', [
+            'id' => $customer->id,
+            'name' => 'North Market',
+            'phone' => '08111111111',
+        ]);
+    }
+
+    public function test_managers_cannot_view_or_edit_customers_or_debt_repayments(): void
+    {
+        $manager = User::factory()->create(['role' => 'manager']);
+        $customer = Customer::query()->create(['name' => 'North Market']);
+        $sale = $this->createCreditSale($customer, $manager);
+        $payment = CustomerPayment::query()->create([
+            'customer_id' => $customer->id,
+            'sale_id' => $sale->id,
+            'user_id' => $manager->id,
+            'amount' => 300,
+            'payment_method' => 'cash',
+        ]);
+        $this->actingAs($manager);
+
+        $this->get(route('customers.index'))
+            ->assertOk()
+            ->assertDontSee(route('customers.edit', $customer));
+        $this->get(route('customers.show', $customer))
+            ->assertOk()
+            ->assertDontSee(route('customers.edit', $customer))
+            ->assertDontSee(route('customers.payments.update', [$customer, $payment]));
+        $this->get(route('customers.edit', $customer))->assertForbidden();
+        $this->put(route('customers.update', $customer), ['name' => 'Changed'])->assertForbidden();
+        $this->put(route('customers.payments.update', [$customer, $payment]), [
+            'amount' => 500,
+            'payment_method' => 'gpay',
+        ])->assertForbidden();
+
+        $this->assertDatabaseHas('customers', ['id' => $customer->id, 'name' => 'North Market']);
+        $this->assertDatabaseHas('customer_payments', [
+            'id' => $payment->id,
+            'amount' => 300,
+            'payment_method' => 'cash',
+        ]);
+    }
+
     public function test_debt_payment_rejects_amounts_above_the_remaining_balance(): void
     {
         $manager = User::factory()->create(['role' => 'manager']);
